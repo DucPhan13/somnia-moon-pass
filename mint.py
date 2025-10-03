@@ -116,22 +116,23 @@ async def main():
             receipt = await asyncio.to_thread(w3.eth.wait_for_transaction_receipt, tx_hash, timeout=300)
             log(f"Mined in block {receipt.blockNumber}", Fore.CYAN)
             if receipt.status == 1:
-                log("Mint successful! Staying on this level.", Fore.GREEN)
+                log("Mint successful!", Fore.GREEN)
                 iteration += 1
             else:
-                log("Tx failed. Moving to next level.", Fore.RED)
+                log("Tx failed. Gracefully stopping.", Fore.RED)
         except Exception as e:
-            log(f"Tx send failed: {e}. Moving to next level.", Fore.RED)
+            log(f"Tx send failed: {e}. Gracefully stopping.", Fore.RED)
+            return
 
         # Pause
         if iteration < MAX_ITERATIONS:
             log(f"Chilling for {DELAY_SECONDS}s...", Fore.WHITE)
             await asyncio.sleep(DELAY_SECONDS)
 
-        if iteration >= MAX_ITERATIONS:
-            log(f"Hit max iterations ({MAX_ITERATIONS}). Done!", Fore.MAGENTA)
-        else:
-            log("Stopped early—check errors above.", Fore.MAGENTA)
+    if iteration >= MAX_ITERATIONS:
+        log(f"Hit max iterations ({MAX_ITERATIONS}). Done!", Fore.MAGENTA)
+    else:
+        log("Stopped early—check errors above.", Fore.MAGENTA)
 
 # Run it
 if __name__ == "__main__":
