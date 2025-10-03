@@ -56,81 +56,82 @@ async def main():
         return
 
     iteration = 0
-    current_data = BASE_DATA
-    log(f"Iteration {iteration + 1}/{MAX_ITERATIONS}: Trying mint ...", Fore.CYAN)
+    while iteration < MAX_ITERATIONS:
+        current_data = BASE_DATA
+        log(f"Iteration {iteration + 1}/{MAX_ITERATIONS}: Trying mint ...", Fore.CYAN)
 
-    # Balance check
-    try:
-        balance = await asyncio.to_thread(w3.eth.get_balance, FROM_ADDRESS)
-        balance_eth = w3.from_wei(balance, 'ether')
-        if balance_eth < MIN_BALANCE_SOMI:
-            log(f"Low balance ({balance_eth:.4f} SOMI < {MIN_BALANCE_SOMI} SOMI). Stopping.", Fore.YELLOW)
+        # Balance check
+        try:
+            balance = await asyncio.to_thread(w3.eth.get_balance, FROM_ADDRESS)
+            balance_eth = w3.from_wei(balance, 'ether')
+            if balance_eth < MIN_BALANCE_SOMI:
+                log(f"Low balance ({balance_eth:.4f} SOMI < {MIN_BALANCE_SOMI} SOMI). Stopping.", Fore.YELLOW)
+                return
+            log(f"Balance: {balance_eth:.4f} SOMI. Good to go.", Fore.WHITE)
+        except Exception as e:
+            log(f"Balance check failed: {e}. Gracefully stopping.", Fore.RED)
+
+        # Build tx
+        try:
+            transaction = {
+                'from': FROM_ADDRESS,
+                'to': TO_ADDRESS,
+                'chainId': CHAIN_ID,
+                'gas': GAS_LIMIT,
+                'maxFeePerGas': MAX_FEE_PER_GAS,
+                'maxPriorityFeePerGas': MAX_PRIORITY_FEE_PER_GAS,
+                'nonce': await asyncio.to_thread(w3.eth.get_transaction_count, FROM_ADDRESS),
+                'data': current_data
+            }
+        except Exception as e:
+            log(f"Couldn’t build tx: {e}. Gracefully stopping.", Fore.RED)
             return
-        log(f"Balance: {balance_eth:.4f} SOMI. Good to go.", Fore.WHITE)
-    except Exception as e:
-        log(f"Balance check failed: {e}. Gracefully stopping.", Fore.RED)
 
-    # Build tx
-    try:
-        transaction = {
-            'from': FROM_ADDRESS,
-            'to': TO_ADDRESS,
-            'chainId': CHAIN_ID,
-            'gas': GAS_LIMIT,
-            'maxFeePerGas': MAX_FEE_PER_GAS,
-            'maxPriorityFeePerGas': MAX_PRIORITY_FEE_PER_GAS,
-            'nonce': await asyncio.to_thread(w3.eth.get_transaction_count, FROM_ADDRESS),
-            'data': current_data
-        }
-    except Exception as e:
-        log(f"Couldn’t build tx: {e}. Gracefully stopping.", Fore.RED)
-        return
+        # Gas estimate
+        try:
+            estimated_gas = await asyncio.to_thread(w3.eth.estimate_gas, {
+                'from': FROM_ADDRESS,
+                'to': TO_ADDRESS,
+                'data': current_data
+            })
+            if estimated_gas > GAS_LIMIT:
+                log(f"Gas warning: Estimate {estimated_gas} > limit {GAS_LIMIT}.", Fore.YELLOW)
+        except Exception as e:
+            log(f"Gas estimation failed: {e}. Gracefully stopping.", Fore.YELLOW)
+            return
 
-    # Gas estimate
-    try:
-        estimated_gas = await asyncio.to_thread(w3.eth.estimate_gas, {
-            'from': FROM_ADDRESS,
-            'to': TO_ADDRESS,
-            'data': current_data
-        })
-        if estimated_gas > GAS_LIMIT:
-            log(f"Gas warning: Estimate {estimated_gas} > limit {GAS_LIMIT}.", Fore.YELLOW)
-    except Exception as e:
-        log(f"Gas estimation failed: {e}. Gracefully stopping.", Fore.YELLOW)
-        return
+        # Sign tx
+        try:
+            signed_txn = await asyncio.to_thread(w3.eth.account.sign_transaction, transaction, PRIVATE_KEY)
+        except Exception as e:
+            log(f"Signing failed: {e}. Gracefully stopping.", Fore.RED)
+            return
 
-    # Sign tx
-    try:
-        signed_txn = await asyncio.to_thread(w3.eth.account.sign_transaction, transaction, PRIVATE_KEY)
-    except Exception as e:
-        log(f"Signing failed: {e}. Gracefully stopping.", Fore.RED)
-        return
+        # Send tx
+        try:
+            tx_hash = await asyncio.to_thread(w3.eth.send_raw_transaction, signed_txn.raw_transaction)
+            log(f"Tx sent! Hash: {w3.to_hex(tx_hash)}", Fore.GREEN)
 
-    # Send tx
-    try:
-        tx_hash = await asyncio.to_thread(w3.eth.send_raw_transaction, signed_txn.raw_transaction)
-        log(f"Tx sent! Hash: {w3.to_hex(tx_hash)}", Fore.GREEN)
+            # Wait for receipt
+            receipt = await asyncio.to_thread(w3.eth.wait_for_transaction_receipt, tx_hash, timeout=300)
+            log(f"Mined in block {receipt.blockNumber}", Fore.CYAN)
+            if receipt.status == 1:
+                log("Mint successful! Staying on this level.", Fore.GREEN)
+                iteration += 1
+            else:
+                log("Tx failed. Moving to next level.", Fore.RED)
+        except Exception as e:
+            log(f"Tx send failed: {e}. Moving to next level.", Fore.RED)
 
-        # Wait for receipt
-        receipt = await asyncio.to_thread(w3.eth.wait_for_transaction_receipt, tx_hash, timeout=300)
-        log(f"Mined in block {receipt.blockNumber}", Fore.CYAN)
-        if receipt.status == 1:
-            log("Mint successful! Staying on this level.", Fore.GREEN)
-            iteration += 1
+        # Pause
+        if iteration < MAX_ITERATIONS:
+            log(f"Chilling for {DELAY_SECONDS}s...", Fore.WHITE)
+            await asyncio.sleep(DELAY_SECONDS)
+
+        if iteration >= MAX_ITERATIONS:
+            log(f"Hit max iterations ({MAX_ITERATIONS}). Done!", Fore.MAGENTA)
         else:
-            log("Tx failed. Moving to next level.", Fore.RED)
-    except Exception as e:
-        log(f"Tx send failed: {e}. Moving to next level.", Fore.RED)
-
-    # Pause
-    if iteration < MAX_ITERATIONS:
-        log(f"Chilling for {DELAY_SECONDS}s...", Fore.WHITE)
-        await asyncio.sleep(DELAY_SECONDS)
-
-    if iteration >= MAX_ITERATIONS:
-        log(f"Hit max iterations ({MAX_ITERATIONS}). Done!", Fore.MAGENTA)
-    else:
-        log("Stopped early—check errors above.", Fore.MAGENTA)
+            log("Stopped early—check errors above.", Fore.MAGENTA)
 
 # Run it
 if __name__ == "__main__":
