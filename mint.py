@@ -11,7 +11,7 @@ import os
 init(autoreset=True)
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(".env.mint")
 
 # Configuration
 RPC_URL = os.getenv("RPC_URL")

@@ -10,8 +10,8 @@ import os
 # Initialize colorama for colored output
 init(autoreset=True)
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env.burn file
+load_dotenv(".env.burn")
 
 # Configuration from .env
 RPC_URL = os.getenv("RPC_URL")
@@ -26,10 +26,8 @@ MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS"))
 DELAY_SECONDS = float(os.getenv("DELAY_SECONDS"))
 PROXY_URL = os.getenv("PROXY_URL")  # None if not set
 MIN_BALANCE_SOMI = float(os.getenv("MIN_BALANCE_SOMI"))
-BASE_DATA = os.getenv("BASE_DATA")  # Base data for Level 1
 # Data levels (Level 1 is a placeholder; replace with actual)
 DATA_LEVELS = [
-    BASE_DATA,  # Level 1
     "0xfd5df1f50000000000000000000000000000000000000000000000000000000000000002",  # Level 2
     "0xfd5df1f50000000000000000000000000000000000000000000000000000000000000003",  # Level 3
     "0xfd5df1f50000000000000000000000000000000000000000000000000000000000000004",  # Level 4
@@ -74,7 +72,7 @@ async def main():
     level_index = 0  # Start with Level 1
     while iteration < MAX_ITERATIONS and level_index < len(DATA_LEVELS):
         current_data = DATA_LEVELS[level_index]
-        log(f"Iteration {iteration + 1}/{MAX_ITERATIONS}: Trying Level {level_index + 1}...", Fore.CYAN)
+        log(f"Iteration {iteration + 1}/{MAX_ITERATIONS}: Trying Level {level_index + 2}...", Fore.CYAN)
 
         # Balance check
         try:
